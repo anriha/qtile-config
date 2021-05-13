@@ -62,22 +62,65 @@ def get_closest(x, y, clients):
         if target_min is None or value < target_min:
             target_min = value
             target_idx = idx
+        elif target_min == value and target.fullscreen:
+            target_idx = idx
 
     if target_min is None:
         return None, None
     return target_idx, clients[target_idx]
 
 
+def closest_screen(x, y, screens):
+    if x is None or y is None:
+        return None
+
+    min_screen = None
+    min_distance = None
+    for screen in screens:
+        if screen.x is None or screen.y is None:
+            continue
+
+        value = math.hypot(screen.x - x, screen.y - y)
+        if min_distance is None or value < min_distance:
+            min_distance = value
+            min_screen = screen
+
+    return min_screen
+
+
 def focus_smart(qtile: Qtile, key):
+    if key is None:
+        return
+    if qtile.current_screen is None:
+        return
     win = qtile.current_window
-    x, y = win.x, win.y
+    if win is None:
+        x, y = qtile.current_screen.x, qtile.current_screen.y
+    else:
+        x, y = win.x, win.y
+
+    if x is None or y is None:
+        return
     screens = qtile.screens
     candidates = []
+    candidates_screens = []
     screens_helper = []
     for screen in screens:
         group = screen.group
+        if group is None or screen.x is None or screen.y is None:
+            continue
         layout = group.layout
-        for c in layout.clients:
+        if key == "h" and screen.x < x:
+            candidates_screens.append(screen)
+        elif key == "j" and screen.y < y:
+            candidates_screens.append(screen)
+        elif key == "k" and screen.y > y:
+            candidates_screens.append(screen)
+        elif key == "l" and screen.x > x:
+            candidates_screens.append(screen)
+
+        clients = list(layout.clients)
+
             if key == "h":
                 if c.info()["x"] < x:
                     candidates.append(c)
@@ -95,15 +138,16 @@ def focus_smart(qtile: Qtile, key):
                     candidates.append(c)
                     screens_helper.append(screen)
 
-
     selected_idx, selected = get_closest(x, y, candidates)
-    if selected is None:
+    if selected is None or selected_idx is None:
+        screen = closest_screen(x, y, screens_helper)
+        if screen is not None:
+            qtile.focus_screen(screen.index)
         return
+
     selected_screen = screens_helper[selected_idx]
     qtile.focus_screen(selected_screen.index)
-    selected_screen.group.layout.group.focus(selected)
-
-    # qtile.current_group.focus(qtile.current_layout.current_client)
+    selected_screen.group.focus(selected)
 
 
 keys = [
