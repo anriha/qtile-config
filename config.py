@@ -1,12 +1,15 @@
 from typing import List  # noqa: F401
+import math
 import os
 import subprocess
 from glob import glob
 import random
 
 from libqtile import bar, layout, widget, hook
+from libqtile.log_utils import logger
 from libqtile.config import Click, Drag, Group, Key, Screen
 from libqtile.lazy import lazy
+from libqtile.core.manager import Qtile
 from Xlib import display as xdisplay
 from nvidia_sensors import NvidiaSensors
 
@@ -44,19 +47,76 @@ def get_num_monitors():
 
 num_monitors = get_num_monitors()
 
+
 def take_screenshot(qtile):
     os.system("maim -s --format=png /dev/stdout | xclip -selection clipboard -t image/png -i")
 
 
+def get_closest(x, y, clients):
+    """Get closest window to a point x,y"""
+    target_min = None
+    target_idx = None
+
+    for idx, target in enumerate(clients):
+        value = math.hypot(target.info()["x"] - x, target.info()["y"] - y)
+        if target_min is None or value < target_min:
+            target_min = value
+            target_idx = idx
+
+    if target_min is None:
+        return None, None
+    return target_idx, clients[target_idx]
+
+
+def focus_smart(qtile: Qtile, key):
+    win = qtile.current_window
+    x, y = win.x, win.y
+    screens = qtile.screens
+    candidates = []
+    screens_helper = []
+    for screen in screens:
+        group = screen.group
+        layout = group.layout
+        for c in layout.clients:
+            if key == "h":
+                if c.info()["x"] < x:
+                    candidates.append(c)
+                    screens_helper.append(screen)
+            elif key == "j":
+                if c.info()["y"] < y:
+                    candidates.append(c)
+                    screens_helper.append(screen)
+            elif key == "k":
+                if c.info()["y"] > y:
+                    candidates.append(c)
+                    screens_helper.append(screen)
+            elif key == "l":
+                if c.info()["x"] > x:
+                    candidates.append(c)
+                    screens_helper.append(screen)
+
+
+    selected_idx, selected = get_closest(x, y, candidates)
+    if selected is None:
+        return
+    selected_screen = screens_helper[selected_idx]
+    qtile.focus_screen(selected_screen.index)
+    selected_screen.group.layout.group.focus(selected)
+
+    # qtile.current_group.focus(qtile.current_layout.current_client)
+
+
 keys = [
     # Switch between windows in current stack pane
-    Key([mod], "j", lazy.layout.down()),
-    Key([mod], "k", lazy.layout.up()),
-    Key([mod], "h", lazy.layout.left()),
-    Key([mod], "l", lazy.layout.right()),
+    Key([mod], "h", lazy.function(focus_smart, "h")),
+    Key([mod], "j", lazy.function(focus_smart, "j")),
+    Key([mod], "k", lazy.function(focus_smart, "k")),
+    Key([mod], "l", lazy.function(focus_smart, "l")),
     # Move windows up or down in current stack
-    Key([mod, "control"], "k", lazy.layout.shuffle_down(), desc="Move window down in current stack "),
-    Key([mod, "control"], "j", lazy.layout.shuffle_up(), desc="Move window up in current stack "),
+    Key([mod, "control"], "k", lazy.layout.shuffle_up(), desc="Move window down in current stack "),
+    Key([mod, "control"], "j", lazy.layout.shuffle_down(), desc="Move window up in current stack "),
+    Key([mod, "control"], "l", lazy.layout.shuffle_right(), desc="Move window up in current stack "),
+    Key([mod, "control"], "h", lazy.layout.shuffle_left(), desc="Move window up in current stack "),
     # Switch window focus to other pane(s) of stack
     Key([mod], "space", lazy.layout.next(), desc="Switch window focus to other pane(s) of stack"),
     # Swap panes of split stack
