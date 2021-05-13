@@ -121,6 +121,10 @@ def focus_smart(qtile: Qtile, key):
 
         clients = list(layout.clients)
 
+        if group.floating_layout is not None:
+            clients.extend(list(group.floating_layout.clients))
+
+        for c in clients:
             if key == "h":
                 if c.info()["x"] < x:
                     candidates.append(c)
@@ -308,20 +312,6 @@ cursor_warp = False
 floating_layout = layout.Floating(
     float_rules=[
         # Run the utility of `xprop` to see the wm class and name of an X client.
-        {"wmclass": "confirm"},
-        {"wmclass": "dialog"},
-        {"wmclass": "download"},
-        {"wmclass": "error"},
-        {"wmclass": "file_progress"},
-        {"wmclass": "notification"},
-        {"wmclass": "splash"},
-        {"wmclass": "toolbar"},
-        {"wmclass": "confirmreset"},  # gitk
-        {"wmclass": "makebranch"},  # gitk
-        {"wmclass": "maketag"},  # gitk
-        {"wname": "branchdialog"},  # gitk
-        {"wname": "pinentry"},  # GPG key password entry
-        {"wmclass": "ssh-askpass"},  # ssh-askpass
         *layout.Floating.default_float_rules,
     ]
 )
