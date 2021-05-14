@@ -144,9 +144,9 @@ def focus_smart(qtile: Qtile, key):
 
     selected_idx, selected = get_closest(x, y, candidates)
     if selected is None or selected_idx is None:
-        screen = closest_screen(x, y, screens_helper)
+        screen = closest_screen(x, y, candidates_screens)
         if screen is not None:
-            qtile.focus_screen(screen.index)
+            qtile.focus_screen(screen.index, warp=False)
         return
 
     selected_screen = screens_helper[selected_idx]
