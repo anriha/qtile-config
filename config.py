@@ -112,9 +112,9 @@ def focus_smart(qtile: Qtile, key):
         layout = group.layout
         if key == "h" and screen.x < x:
             candidates_screens.append(screen)
-        elif key == "j" and screen.y < y:
+        elif key == "j" and screen.y > y:
             candidates_screens.append(screen)
-        elif key == "k" and screen.y > y:
+        elif key == "k" and screen.y < y:
             candidates_screens.append(screen)
         elif key == "l" and screen.x > x:
             candidates_screens.append(screen)
@@ -125,16 +125,18 @@ def focus_smart(qtile: Qtile, key):
             clients.extend(list(group.floating_layout.clients))
 
         for c in clients:
+            if c.info()["name"] == "Kodi":
+                continue
             if key == "h":
                 if c.info()["x"] < x:
                     candidates.append(c)
                     screens_helper.append(screen)
             elif key == "j":
-                if c.info()["y"] < y:
+                if c.info()["y"] > y:
                     candidates.append(c)
                     screens_helper.append(screen)
             elif key == "k":
-                if c.info()["y"] > y:
+                if c.info()["y"] < y:
                     candidates.append(c)
                     screens_helper.append(screen)
             elif key == "l":
@@ -142,6 +144,7 @@ def focus_smart(qtile: Qtile, key):
                     candidates.append(c)
                     screens_helper.append(screen)
 
+    logger.warn(candidates)
     selected_idx, selected = get_closest(x, y, candidates)
     if selected is None or selected_idx is None:
         screen = closest_screen(x, y, candidates_screens)
