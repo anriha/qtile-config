@@ -90,28 +90,13 @@ def closest_screen(x, y, screens):
     return min_screen
 
 
-def focus_smart(qtile: Qtile, key):
-    if key is None:
-        return
-    if qtile.current_screen is None:
-        return
-    win = qtile.current_window
-    if win is None:
-        x, y = qtile.current_screen.x, qtile.current_screen.y
-    else:
-        x, y = win.x, win.y
-
-    if x is None or y is None:
-        return
+def get_candidates_screens(qtile, x, y, key, exclude_screens=[]):
     screens = qtile.screens
-    candidates = []
     candidates_screens = []
-    screens_helper = []
+
     for screen in screens:
-        group = screen.group
-        if group is None or screen.x is None or screen.y is None:
+        if screen in exclude_screens:
             continue
-        layout = group.layout
         if key == "h" and screen.x < x:
             candidates_screens.append(screen)
         elif key == "j" and screen.y > y:
@@ -121,6 +106,28 @@ def focus_smart(qtile: Qtile, key):
         elif key == "l" and screen.x > x:
             candidates_screens.append(screen)
 
+    return candidates_screens
+
+
+def focus_smart(qtile: Qtile, key):
+    if key is None or qtile.current_screen is None:
+        return
+
+    win = qtile.current_window
+    if win is None:
+        x, y = qtile.current_screen.x, qtile.current_screen.y
+    else:
+        x, y = win.x, win.y
+
+    screens = qtile.screens
+    candidates = []
+    candidates_screens = get_candidates_screens(qtile, x, y, key)
+    screens_helper = []
+    for screen in screens:
+        group = screen.group
+        if group is None or screen.x is None or screen.y is None:
+            continue
+        layout = group.layout
         clients = list(layout.clients)
 
         if group.floating_layout is not None:
@@ -159,12 +166,30 @@ def focus_smart(qtile: Qtile, key):
     selected_screen.group.focus(selected)
 
 
+def swap_screen(qtile, key):
+    win = qtile.current_window
+    if win is None:
+        return
+    else:
+        x, y = win.x, win.y
+    screens_candidates = get_candidates_screens(qtile, x, y, key, exclude_screens=[qtile.current_screen])
+    screen = closest_screen(x, y, screens_candidates)
+    if screen is not None:
+        screen_idx = screen.index
+        qtile.current_window.togroup(screen.group.name)
+        qtile.focus_screen(screen_idx, warp=False)
+
+
 keys = [
     # Switch between windows in current stack pane
     Key([mod], "h", lazy.function(focus_smart, "h")),
     Key([mod], "j", lazy.function(focus_smart, "j")),
     Key([mod], "k", lazy.function(focus_smart, "k")),
     Key([mod], "l", lazy.function(focus_smart, "l")),
+    Key([mod, "shift"], "h", lazy.function(swap_screen, "h")),
+    Key([mod, "shift"], "j", lazy.function(swap_screen, "j")),
+    Key([mod, "shift"], "k", lazy.function(swap_screen, "k")),
+    Key([mod, "shift"], "l", lazy.function(swap_screen, "l")),
     # Move windows up or down in current stack
     Key([mod, "control"], "k", lazy.layout.shuffle_up(),
         desc="Move window down in current stack "),
