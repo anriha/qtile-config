@@ -10,6 +10,7 @@ from libqtile.log_utils import logger
 from libqtile.config import Click, Drag, Group, Key, Screen
 from libqtile.lazy import lazy
 from libqtile.core.manager import Qtile
+from libqtile.backend.x11.window import Window
 from Xlib import display as xdisplay
 from nvidia_sensors import NvidiaSensors
 
@@ -40,7 +41,8 @@ def get_num_monitors():
                 preferred = monitor.num_preferred
             if preferred:
                 num_monitors += 1
-    except Exception as _:
+    except Exception as exc:
+        logger.error(str(exc))
         return 1
     else:
         return num_monitors
@@ -374,7 +376,34 @@ wmname = "LG3D"
 
 
 @hook.subscribe.client_new
-def floating_size_hints(window):
+def floating_size_hints(window: Window):
     hints = window.window.get_wm_normal_hints()
     if hints and 0 < hints["max_width"] < 1000:
         window.floating = True
+
+
+@hook.subscribe.client_new
+def new_window_fullscreen(window: Window):
+    qtile: Qtile = window.qtile
+
+    current_screen = qtile.current_screen
+
+    if current_screen is None:
+        return
+
+    group = current_screen.group
+
+    if group is None:
+        return
+
+    fullscreen_client = None
+    if group.floating_layout is not None:
+        for client in group.floating_layout.clients:
+            if client.fullscreen:
+                fullscreen_client = client
+
+    if window.group is None:
+        window.togroup(group.name)
+    if fullscreen_client is not None:
+        fullscreen_client.toggle_fullscreen()
+        window.toggle_fullscreen()
