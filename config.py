@@ -1,17 +1,18 @@
-from typing import List  # noqa: F401
 import math
 import os
+import random
 import subprocess
 from glob import glob
-import random
+from typing import List  # noqa: F401
 
-from libqtile import bar, layout, widget, hook
-from libqtile.log_utils import logger
-from libqtile.config import Click, Drag, Group, Key, Screen
-from libqtile.lazy import lazy
-from libqtile.core.manager import Qtile
+from libqtile import bar, hook, layout, widget
 from libqtile.backend.x11.window import Window
+from libqtile.config import Click, Drag, Group, Key, Screen
+from libqtile.core.manager import Qtile
+from libqtile.lazy import lazy
+from libqtile.log_utils import logger
 from Xlib import display as xdisplay
+
 from nvidia_sensors import NvidiaSensors
 
 mod = "mod4"
@@ -32,8 +33,7 @@ def get_num_monitors():
         resources = screen.root.xrandr_get_screen_resources()
 
         for output in resources.outputs:
-            monitor = display.xrandr_get_output_info(
-                output, resources.config_timestamp)
+            monitor = display.xrandr_get_output_info(output, resources.config_timestamp)
             preferred = False
             if hasattr(monitor, "preferred"):
                 preferred = monitor.preferred
@@ -52,8 +52,7 @@ num_monitors = get_num_monitors()
 
 
 def take_screenshot(qtile):
-    os.system(
-        "maim -s --format=png /dev/stdout | xclip -selection clipboard -t image/png -i")
+    os.system("maim -s -u | xclip -selection clipboard -t image/png -i")
 
 
 def get_closest(x, y, clients):
@@ -119,7 +118,7 @@ def focus_smart(qtile: Qtile, key):
     if win is None:
         x, y = qtile.current_screen.x, qtile.current_screen.y
     else:
-        x, y = win.x, win.y
+        x, y = win.info()["x"], win.info()["y"]
 
     screens = qtile.screens
     candidates = []
@@ -133,8 +132,16 @@ def focus_smart(qtile: Qtile, key):
         clients = list(layout.clients)
 
         if group.floating_layout is not None:
-            clients.extend([c for c in list(group.floating_layout.clients) if int(
-                c.info()["group"][-1]) == screen.index])
+            for client in group.floating_layout.clients:
+                if client.info()["name"] == "Kodi":
+                    continue
+                if client.fullscreen and int(client.info()["group"][-1]) == screen.index:
+                    clients = [client]
+                    break
+            else:
+                clients.extend(
+                    [c for c in list(group.floating_layout.clients) if int(c.info()["group"][-1]) == screen.index]
+                )
 
         for c in clients:
             if c.info()["name"] == "Kodi":
@@ -193,40 +200,30 @@ keys = [
     Key([mod, "shift"], "k", lazy.function(swap_screen, "k")),
     Key([mod, "shift"], "l", lazy.function(swap_screen, "l")),
     # Move windows up or down in current stack
-    Key([mod, "control"], "k", lazy.layout.shuffle_up(),
-        desc="Move window down in current stack "),
-    Key([mod, "control"], "j", lazy.layout.shuffle_down(),
-        desc="Move window up in current stack "),
-    Key([mod, "control"], "l", lazy.layout.shuffle_right(),
-        desc="Move window up in current stack "),
-    Key([mod, "control"], "h", lazy.layout.shuffle_left(),
-        desc="Move window up in current stack "),
+    Key([mod, "control"], "k", lazy.layout.shuffle_up(), desc="Move window down in current stack "),
+    Key([mod, "control"], "j", lazy.layout.shuffle_down(), desc="Move window up in current stack "),
+    Key([mod, "control"], "l", lazy.layout.shuffle_right(), desc="Move window up in current stack "),
+    Key([mod, "control"], "h", lazy.layout.shuffle_left(), desc="Move window up in current stack "),
     # Switch window focus to other pane(s) of stack
-    Key([mod], "space", lazy.layout.next(),
-        desc="Switch window focus to other pane(s) of stack"),
+    Key([mod], "space", lazy.layout.next(), desc="Switch window focus to other pane(s) of stack"),
     # Swap panes of split stack
-    Key([mod, "shift"], "space", lazy.layout.rotate(),
-        desc="Swap panes of split stack"),
+    Key([mod, "shift"], "space", lazy.layout.rotate(), desc="Swap panes of split stack"),
     Key([mod], "f", lazy.window.toggle_fullscreen()),
     Key([mod, "shift"], "f", lazy.window.toggle_floating()),
     # Toggle between split and unsplit sides of stack.
     # Split = all windows displayed
     # Unsplit = 1 window displayed, like Max layout, but still with
     # multiple stack panes
-    Key([mod, "shift"], "Return", lazy.layout.toggle_split(),
-        desc="Toggle between split and unsplit sides of stack"),
+    Key([mod, "shift"], "Return", lazy.layout.toggle_split(), desc="Toggle between split and unsplit sides of stack"),
     Key([mod], "Return", lazy.spawn(terminal), desc="Launch terminal"),
     # Toggle between different layouts as defined below
     Key([mod], "Tab", lazy.next_layout(), desc="Toggle between layouts"),
     Key([mod], "q", lazy.window.kill(), desc="Kill focused window"),
     Key([mod, "control"], "r", lazy.restart(), desc="Restart qtile"),
     Key([mod, "control"], "q", lazy.shutdown(), desc="Shutdown qtile"),
-    Key([mod], "r", lazy.spawn("dmenu_run"),
-        desc="Spawn a dmenu_run launcher"),
-    Key([], "XF86AudioRaiseVolume", lazy.spawn(
-        "pactl set-sink-volume @DEFAULT_SINK@ +5%")),
-    Key([], "XF86AudioLowerVolume", lazy.spawn(
-        "pactl set-sink-volume @DEFAULT_SINK@ -5%")),
+    Key([mod], "r", lazy.spawn("dmenu_run"), desc="Spawn a dmenu_run launcher"),
+    Key([], "XF86AudioRaiseVolume", lazy.spawn("pactl set-sink-volume @DEFAULT_SINK@ +5%")),
+    Key([], "XF86AudioLowerVolume", lazy.spawn("pactl set-sink-volume @DEFAULT_SINK@ -5%")),
     Key([], "Print", lazy.function(take_screenshot)),
 ]
 
@@ -314,8 +311,7 @@ for screen_id in range(num_monitors):
         wallpaper_mode="fill",
         bottom=bar.Bar(
             [
-                widget.GroupBox(
-                    visible_groups=[a + str(screen_id) for a in "1234567890"]),
+                widget.GroupBox(visible_groups=[a + str(screen_id) for a in "1234567890"]),
                 widget.Spacer(length=50),
                 widget.WindowName(),
                 widget.Spacer(),
@@ -341,10 +337,8 @@ for screen_id in range(num_monitors):
 
 # Drag floating layouts.
 mouse = [
-    Drag([mod], "Button1", lazy.window.set_position_floating(),
-         start=lazy.window.get_position()),
-    Drag([mod], "Button3", lazy.window.set_size_floating(),
-         start=lazy.window.get_size()),
+    Drag([mod], "Button1", lazy.window.set_position_floating(), start=lazy.window.get_position()),
+    Drag([mod], "Button3", lazy.window.set_size_floating(), start=lazy.window.get_size()),
     Click([mod], "Button2", lazy.window.bring_to_front()),
 ]
 
@@ -399,7 +393,7 @@ def new_window_fullscreen(window: Window):
     fullscreen_client = None
     if group.floating_layout is not None:
         for client in group.floating_layout.clients:
-            if client.fullscreen:
+            if client.fullscreen and int(client.info()["group"][-1]) == current_screen.index:
                 fullscreen_client = client
 
     if window.group is None:
